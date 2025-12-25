@@ -8,7 +8,7 @@
 <body>
 
     <div id="setup" class="setup-screen">
-        <h1>KNIFFEL ONLINE PRO</h1>
+        <h1>KNIFFEL ONLINE</h1>
         <div id="playerSetup">
             <p>Dein Nickname:</p>
             <input type="text" id="userName" placeholder="z.B. Chris" style="padding:10px; font-size:18px; border-radius:5px; width:220px;">
@@ -17,9 +17,9 @@
         </div>
     </div>
 
-    <div id="game" class="main-layout">
+    <div id="game" class="main-layout" style="display:none;">
         <div class="action-zone">
-            <div id="pDisplay" style="font-size: 22px; color: var(--gold); font-weight: bold;">Verbindung wird hergestellt...</div>
+            <div id="pDisplay" style="font-size: 22px; color: gold; font-weight: bold;">Warte auf Daten...</div>
             <div class="dice-grid" id="diceGrid"></div>
             <div style="font-size: 16px; margin-top: 10px;">Wurf: <span id="rollCount">0</span> / 3</div>
             <button class="btn" id="rollBtn" onclick="handleRoll()">WÜRFELN</button>
@@ -27,35 +27,33 @@
         </div>
 
         <div class="score-block-container">
-            <table class="score-table" id="kniffelTable" style="table-layout: fixed; width: 100%;">
-                <thead id="tableHead">
-                    <tr id="headerRow">
-                        <th class="cat-name" style="width: 120px;">Kategorien</th>
-                    </tr>
-                </thead>
+            <table class="score-table" id="kniffelTable" style="width: 100%; border-collapse: collapse;">
+                <thead><tr id="headerRow"><th class="cat-name">Kategorien</th></tr></thead>
                 <tbody id="upperBody"></tbody>
                 <tbody id="upperTotals"></tbody>
                 <tbody id="lowerBody"></tbody>
                 <tfoot id="finalTotals"></tfoot>
             </table>
             
-            <div id="restartContainer" style="display:none; text-align:center; margin-top:20px; padding-bottom:40px;">
-                <button class="btn restart-btn" onclick="resetOnlineGame()">🔄 RAUM LEEREN & NEUSTART</button>
+            <div id="chatContainer" style="margin-top:20px; background: #1a1a2e; border: 1px solid #444; border-radius: 8px; padding: 10px;">
+                <div id="chatBox" style="height: 150px; overflow-y: auto; color: white; font-size: 14px; text-align: left; margin-bottom: 10px; padding: 5px; background: #0f0f1a;">
+                    <i>Willkommen im Chat!</i>
+                </div>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="chatInput" placeholder="Nachricht..." style="flex: 1; padding: 8px; border-radius: 4px; border: none;">
+                    <button class="btn" onclick="sendChatMessage()" style="padding: 8px 15px;">Senden</button>
+                </div>
             </div>
-        </div>
-    </div>
 
-    <div id="endOverlay" class="overlay">
-        <div class="modal">
-            <h2>Endergebnis</h2>
-            <ul id="winnerList" class="winner-list"></ul>
-            <button class="btn" onclick="closeOverlay()">Tabelle ansehen</button>
+            <div id="restartContainer" style="display:none; text-align:center; margin-top:20px; padding-bottom:40px;">
+                <button class="btn restart-btn" onclick="resetOnlineGame()">🔄 RAUM LEEREN</button>
+            </div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, set, onValue, update, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAsznvjalpgFbi1LN1LLjJvlttZRC3NOzI",
@@ -68,6 +66,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const gameRef = ref(db, 'kniffel/testraum');
+        const chatRef = ref(db, 'kniffel/testraum/chat'); // Pfad für den Chat
 
         let myName, myIndex = null, gameState = null;
 
@@ -84,7 +83,10 @@
 
         window.initOnlineGame = function() {
             myName = document.getElementById('userName').value.trim();
-            if(!myName) return alert("Bitte Name eingeben!");
+            if(!myName) return alert("Name fehlt!");
+
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('game').style.display = 'flex';
 
             onValue(gameRef, (snapshot) => {
                 const data = snapshot.val();
@@ -104,13 +106,38 @@
                             update(gameRef, { players: newP });
                         }
                     }
+                    // Chat-Nachrichten anzeigen
+                    if(data.chat) {
+                        const chatBox = document.getElementById('chatBox');
+                        chatBox.innerHTML = '';
+                        Object.values(data.chat).slice(-10).forEach(msg => { // Zeige nur die letzten 10 Nachrichten
+                            chatBox.innerHTML += `<div><b>${msg.user}:</b> ${msg.text}</div>`;
+                        });
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
                 }
                 syncUI();
             });
-            document.getElementById('setup').style.display = 'none';
-            document.getElementById('game').style.display = 'flex';
+
             createDiceElements();
         };
+
+        // CHAT SENDEN FUNKTION
+        window.sendChatMessage = function() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if(text !== "") {
+                push(chatRef, { user: myName, text: text });
+                input.value = '';
+            }
+        };
+
+        // Enter-Taste zum Senden erlauben
+        document.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter' && document.activeElement.id === 'chatInput') {
+                sendChatMessage();
+            }
+        });
 
         function createDiceElements() {
             const grid = document.getElementById('diceGrid');
@@ -125,53 +152,37 @@
 
         function syncUI() {
             if(!gameState || !gameState.players) return;
-            
-            // Header neu aufbauen
             const hRow = document.getElementById('headerRow');
             hRow.innerHTML = '<th class="cat-name">Kategorien</th>';
             gameState.players.forEach((p, i) => {
                 const th = document.createElement('th');
                 th.innerText = p.name;
-                if(i === gameState.activePlayer) th.className = 'active-col';
+                if(i === gameState.activePlayer) th.style.backgroundColor = "rgba(255, 215, 0, 0.2)";
                 hRow.appendChild(th);
             });
-
-            document.getElementById('pDisplay').innerText = gameState.players[gameState.activePlayer].name + " ist dran";
-            document.getElementById('rollCount').innerText = gameState.rolls;
-            document.getElementById('myRoleInfo').innerText = "Spieler: " + myName;
-            
             gameState.dice.forEach((val, i) => {
                 const dieEl = document.getElementById('die' + i);
                 if(!dieEl) return;
-                dieEl.classList.toggle('keep', gameState.keeps[i]);
+                dieEl.className = gameState.keeps[i] ? 'die keep' : 'die';
                 dieEl.style.backgroundImage = val > 0 ? `url('wuerfel${val}.png')` : "none";
-                if(val === 0) dieEl.style.backgroundColor = "#2a2a4a";
             });
-
+            document.getElementById('pDisplay').innerText = gameState.players[gameState.activePlayer].name + " ist dran";
             document.getElementById('rollBtn').disabled = (gameState.activePlayer !== myIndex || gameState.rolls >= 3);
-            
-            renderRows('upperBody', upperCats);
-            renderUpperSums();
-            renderRows('lowerBody', lowerCats);
-            renderFinalTotals();
-            checkGameOver();
+            renderSection('upperBody', upperCats);
+            renderSection('lowerBody', lowerCats);
+            renderSums();
         }
 
-        function renderRows(id, cats) {
-            const el = document.getElementById(id); el.innerHTML = '';
+        function renderSection(tbodyId, cats) {
+            const body = document.getElementById(tbodyId);
+            body.innerHTML = '';
             cats.forEach(c => {
                 const tr = document.createElement('tr');
-                const tdCat = document.createElement('td');
-                tdCat.className = 'cat-name';
-                tdCat.innerText = c.n;
-                tr.appendChild(tdCat);
-
+                tr.innerHTML = `<td class="cat-name">${c.n}</td>`;
                 gameState.players.forEach((p, i) => {
                     const td = document.createElement('td');
-                    if(i === gameState.activePlayer) td.className = 'active-col';
-                    const score = p.scores ? p.scores[c.id] : undefined;
-                    
-                    if(score !== undefined) {
+                    const score = (p.scores && p.scores[c.id] !== undefined) ? p.scores[c.id] : null;
+                    if(score !== null) {
                         td.innerHTML = `<span class="filled">${score}</span>`;
                     } else if(i === gameState.activePlayer && i === myIndex && gameState.rolls > 0) {
                         const val = calculatePoints(c.id, gameState.dice, c.v);
@@ -183,50 +194,28 @@
                     }
                     tr.appendChild(td);
                 });
-                el.appendChild(tr);
+                body.appendChild(tr);
             });
         }
 
-        function renderUpperSums() {
-            const el = document.getElementById('upperTotals'); el.innerHTML = '';
-            const labels = ["Summe Oben", "Bonus (63+)", "Gesamt Oben"];
-            labels.forEach((label, rIdx) => {
-                const tr = document.createElement('tr');
-                tr.className = rIdx === 2 ? 'grand-total-row' : 'subtotal-row';
-                const tdCat = document.createElement('td');
-                tdCat.className = 'cat-name';
-                tdCat.innerText = label;
-                tr.appendChild(tdCat);
-
-                gameState.players.forEach((p, i) => {
-                    const td = document.createElement('td');
-                    if(i === gameState.activePlayer) td.className = 'active-col';
-                    const sum = upperCats.reduce((s, c) => s + (p.scores ? (p.scores[c.id] || 0) : 0), 0);
-                    let val = (rIdx === 0) ? sum : (rIdx === 1 ? (sum >= 63 ? 35 : 0) : sum + (sum >= 63 ? 35 : 0));
-                    td.innerText = val;
-                    tr.appendChild(td);
-                });
-                el.appendChild(tr);
-            });
-        }
-
-        function renderFinalTotals() {
-            const el = document.getElementById('finalTotals'); el.innerHTML = '';
-            const tr = document.createElement('tr'); tr.className = 'grand-total-row';
-            const tdCat = document.createElement('td');
-            tdCat.className = 'cat-name';
-            tdCat.innerText = "GESAMT";
-            tr.appendChild(tdCat);
-
+        function renderSums() {
+            const upTotal = document.getElementById('upperTotals'); upTotal.innerHTML = '';
+            const finalTotal = document.getElementById('finalTotals'); finalTotal.innerHTML = '';
+            const trUpper = document.createElement('tr');
+            trUpper.innerHTML = `<td class="cat-name">Gesamt Oben</td>`;
+            const trFinal = document.createElement('tr');
+            trFinal.innerHTML = `<td class="cat-name">GESAMT</td>`;
             gameState.players.forEach((p, i) => {
-                const td = document.createElement('td');
-                if(i === gameState.activePlayer) td.className = 'active-col';
-                const up = upperCats.reduce((s, c) => s + (p.scores ? (p.scores[c.id] || 0) : 0), 0);
-                const lo = lowerCats.reduce((s, c) => s + (p.scores ? (p.scores[c.id] || 0) : 0), 0);
-                td.innerText = up + (up >= 63 ? 35 : 0) + lo;
-                tr.appendChild(td);
+                const upSum = upperCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
+                const bonus = upSum >= 63 ? 35 : 0;
+                const loSum = lowerCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
+                const tdU = document.createElement('td'); tdU.innerText = upSum + bonus;
+                trUpper.appendChild(tdU);
+                const tdF = document.createElement('td'); tdF.innerText = upSum + bonus + loSum;
+                trFinal.appendChild(tdF);
             });
-            el.appendChild(tr);
+            upTotal.appendChild(trUpper);
+            finalTotal.appendChild(trFinal);
         }
 
         window.handleRoll = function() {
@@ -266,15 +255,9 @@
             return 0;
         }
 
-        function checkGameOver() {
-            const allFilled = gameState.players.every(p => p.scores && Object.keys(p.scores).length === 13);
-            if(allFilled) document.getElementById('restartContainer').style.display = 'block';
-        }
-
         window.resetOnlineGame = function() {
-            if(confirm("Wirklich alles löschen?")) { set(gameRef, null); location.reload(); }
+            if(confirm("Löschen?")) { set(gameRef, null); location.reload(); }
         };
-        window.closeOverlay = () => document.getElementById('endOverlay').style.display='none';
     </script>
 </body>
 </html>
