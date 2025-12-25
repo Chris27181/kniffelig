@@ -2,40 +2,42 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Kniffel Deluxe - Image Version</title>
-<link rel="stylesheet" href="styles_kniffel.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kniffel Online Pro</title>
+    <link rel="stylesheet" href="styles_kniffel.css">
 </head>
 <body>
 
     <div id="setup" class="setup-screen">
         <h1>KNIFFEL ONLINE</h1>
-        <div id="playerSetup">
-            <p>Dein Nickname:</p>
-            <input type="text" id="userName" placeholder="z.B. Chris" style="padding:10px; font-size:18px; border-radius:5px; width:220px;">
-            <br><br>
-            <button class="btn" onclick="initOnlineGame()">Dem Spiel beitreten</button>
+        <div id="authBox" style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; width: 320px; text-align: center; backdrop-filter: blur(10px); border: 1px solid rgba(255,215,0,0.3);">
+            <p style="color: gold; font-weight: bold; font-size: 1.2em;">Willkommen!</p>
+            <p>Wähle einen Nicknamen:</p>
+            <input type="text" id="userName" placeholder="z.B. Chris" style="width:90%; padding:12px; margin-bottom:15px; border-radius: 8px; border:none; font-size: 16px;">
+            <button class="btn" onclick="startAnonymously()" style="width:100%; font-size: 18px; letter-spacing: 1px;">SPIEL BEITRETEN</button>
+            <p id="authError" style="color: #ff6b6b; font-size: 12px; margin-top: 10px;"></p>
         </div>
     </div>
 
     <div id="game" class="main-layout" style="display:none;">
         <div class="action-zone">
-            <div id="pDisplay" style="font-size: 22px; color: #090866; font-weight: bold;">Warte auf Daten...</div>
+            <div id="pDisplay" style="font-size: 22px; color: #090866; font-weight: bold; text-shadow: 0 1px 2px rgba(255,255,255,0.5);">Warte auf Daten...</div>
             <div class="dice-grid" id="diceGrid"></div>
             <div style="font-size: 16px; margin-top: 10px;">Wurf: <span id="rollCount">0</span> / 3</div>
             <button class="btn" id="rollBtn" onclick="handleRoll()">WÜRFELN</button>
-            <div id="myRoleInfo" style="font-size: 12px; color: #777; margin-top: 10px;"></div>
+            <div id="myRoleInfo" style="font-size: 12px; color: #aaa; margin-top: 10px;"></div>
         </div>
 
         <div class="score-block-container" style="overflow-x: auto;">
-            <table class="score-table" id="kniffelTable" style="min-width: 320px; border-collapse: collapse; width: 100%;">
+            <table class="score-table" id="kniffelTable">
                 <thead><tr id="headerRow"><th class="cat-name">Kategorien</th></tr></thead>
                 <tbody id="upperBody"></tbody>
-                <tbody id="upperTotals"></tbody> 
+                <tbody id="upperTotals"></tbody>
                 <tbody id="lowerBody"></tbody>
-                <tfoot id="finalTotals"></tfoot> 
+                <tfoot id="finalTotals"></tfoot>
             </table>
-            
-            <div id="chatContainer">
+
+            <div id="chatContainer" style="margin-top: 20px;">
                 <div id="chatBox"><i>Willkommen im Chat!</i></div>
                 <div style="display: flex; gap: 5px;">
                     <input type="text" id="chatInput" placeholder="Nachricht...">
@@ -43,15 +45,27 @@
                 </div>
             </div>
 
+            <div id="leaderboardContainer" style="margin-top:30px; background: linear-gradient(145deg, #1e1e35, #16162a); border: 2px solid #ffd700; border-radius: 15px; padding: 20px; width: 100%; max-width: 450px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; overflow: hidden; margin-left: auto; margin-right: auto;">
+                <div style="position: absolute; top: -20px; right: -20px; font-size: 80px; opacity: 0.1; color: gold; transform: rotate(20deg);">🏆</div>
+                <h3 style="color:gold; margin: 0 0 15px 0; text-align:center; font-size: 24px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 10px;">
+                    Hall of Fame
+                </h3>
+                <div id="leaderboardList" style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="text-align:center; color: #888;">Suche die besten Würfler...</div>
+                </div>
+            </div>
+
             <div id="restartContainer" style="display:none; text-align:center; margin-top:20px; padding-bottom:40px;">
                 <button class="btn restart-btn" onclick="resetOnlineGame()">🔄 RAUM LEEREN</button>
+                <button class="btn" onclick="signOutUser()" style="background: #444; color: white; margin-top: 10px; border: 1px solid #666;">Account wechseln</button>
             </div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue, update, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, set, onValue, update, push, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAsznvjalpgFbi1LN1LLjJvlttZRC3NOzI",
@@ -63,10 +77,12 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        const auth = getAuth(app);
         const gameRef = ref(db, 'kniffel/testraum');
         const chatRef = ref(db, 'kniffel/testraum/chat');
+        const highscoreRef = ref(db, 'kniffel/highscores');
 
-        let myName, myIndex = null, gameState = null;
+        let myName, myIndex = null, gameState = null, currentUser = null;
 
         const upperCats = [
             { id: '1', n: 'Einser', v: 1 }, { id: '2', n: 'Zweier', v: 2 },
@@ -79,12 +95,85 @@
             { id: 'gs', n: 'Gr. Straße' }, { id: 'kn', n: 'Kniffel' }, { id: 'ch', n: 'Chance' }
         ];
 
+        window.startAnonymously = async function() {
+            const name = document.getElementById('userName').value.trim();
+            const errorEl = document.getElementById('authError');
+            if(!name) return errorEl.innerText = "Bitte Namen eingeben!";
+            try {
+                const userCredential = await signInAnonymously(auth);
+                await updateProfile(userCredential.user, { displayName: name });
+            } catch (error) {
+                errorEl.innerText = "Fehler: " + error.message;
+            }
+        };
+
+        window.signOutUser = () => signOut(auth).then(() => location.reload());
+
+        onAuthStateChanged(auth, (user) => {
+            if (user && user.displayName) {
+                currentUser = user;
+                myName = user.displayName;
+                initOnlineGame();
+                loadLeaderboard();
+            } else {
+                document.getElementById('setup').style.display = 'flex';
+                document.getElementById('game').style.display = 'none';
+            }
+        });
+
+        function loadLeaderboard() {
+            onValue(highscoreRef, (snapshot) => {
+                const data = snapshot.val();
+                const listEl = document.getElementById('leaderboardList');
+                if(!data) return listEl.innerHTML = "<div style='text-align:center;'>Noch keine Helden eingetragen.</div>";
+                
+                const sorted = Object.values(data).sort((a,b) => b.score - a.score).slice(0, 5);
+                
+                listEl.innerHTML = sorted.map((entry, i) => {
+                    let medal = "";
+                    let bgColor = "rgba(255,255,255,0.05)";
+                    let textColor = "white";
+                    if(i === 0) { medal = "🥇 "; bgColor = "rgba(255, 215, 0, 0.15)"; textColor = "#ffd700"; }
+                    if(i === 1) medal = "🥈 ";
+                    if(i === 2) medal = "🥉 ";
+
+                    return `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background: ${bgColor}; border-radius: 8px; border-left: 4px solid ${i === 0 ? 'gold' : '#444'};">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="font-weight:bold; color: ${textColor}; width: 25px;">${medal || (i+1 + ". ")}</span>
+                                <span style="font-weight: ${i === 0 ? 'bold' : 'normal'}; color: ${textColor};">${entry.name}</span>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="color:gold; font-weight:bold; font-size: 1.1em;">${entry.score} <small style="font-size: 0.7em;">PKT</small></div>
+                                <div style="font-size: 0.7em; color: #888;">${entry.date || ""}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            });
+        }
+
+        async function saveMyResult() {
+            if (!currentUser || myIndex === null) return;
+            const p = gameState.players[myIndex];
+            const upSum = upperCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
+            const loSum = lowerCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
+            const bonus = upSum >= 63 ? 35 : 0;
+            const finalScore = upSum + bonus + loSum;
+
+            const userScoreRef = ref(db, 'kniffel/highscores/' + currentUser.uid);
+            const snapshot = await get(userScoreRef);
+            const currentRecord = snapshot.exists() ? snapshot.val().score : 0;
+
+            if (finalScore > currentRecord) {
+                update(userScoreRef, { name: myName, score: finalScore, date: new Date().toLocaleDateString() });
+                push(chatRef, { user: "SYSTEM", text: `🌟 NEUER PERSÖNLICHER REKORD: ${myName} hat ${finalScore} Punkte erreicht!` });
+            }
+        }
+
         window.initOnlineGame = function() {
-            myName = document.getElementById('userName').value.trim();
-            if(!myName) return alert("Name fehlt!");
             document.getElementById('setup').style.display = 'none';
             document.getElementById('game').style.display = 'flex';
-
             onValue(gameRef, (snapshot) => {
                 const data = snapshot.val();
                 if(!data) {
@@ -117,17 +206,6 @@
             createDiceElements();
         };
 
-        function createDiceElements() {
-            const grid = document.getElementById('diceGrid');
-            grid.innerHTML = '';
-            for(let i=0; i<5; i++) {
-                const d = document.createElement('div');
-                d.className = 'die'; d.id = 'die' + i;
-                d.onclick = () => toggleKeep(i);
-                grid.appendChild(d);
-            }
-        }
-
         function syncUI() {
             if(!gameState || !gameState.players) return;
             const hRow = document.getElementById('headerRow');
@@ -138,18 +216,15 @@
                 if(i === gameState.activePlayer) th.style.backgroundColor = "rgba(255, 215, 0, 0.2)";
                 hRow.appendChild(th);
             });
-
             gameState.dice.forEach((val, i) => {
                 const dieEl = document.getElementById('die' + i);
                 if(!dieEl) return;
                 dieEl.className = gameState.keeps[i] ? 'die keep' : 'die';
                 dieEl.style.backgroundImage = val > 0 ? `url('wuerfel${val}.png')` : "none";
             });
-
             document.getElementById('pDisplay').innerText = gameState.players[gameState.activePlayer].name + " ist dran";
             document.getElementById('rollCount').innerText = gameState.rolls;
-            document.getElementById('myRoleInfo').innerText = "Spieler: " + myName;
-            
+            document.getElementById('myRoleInfo').innerText = "Angemeldet als: " + myName;
             renderSection('upperBody', upperCats);
             renderSection('lowerBody', lowerCats);
             renderSums();
@@ -183,16 +258,13 @@
         function renderSums() {
             const upTotal = document.getElementById('upperTotals'); upTotal.innerHTML = '';
             const finalTotal = document.getElementById('finalTotals'); finalTotal.innerHTML = '';
-            
             const rowsUpper = [
                 { label: "Punkte oben", type: "sum" },
                 { label: "Bonus (ab 63 Pkte)", type: "bonus" },
                 { label: "Gesamtpunkte oben", type: "totalUp" }
             ];
-
             rowsUpper.forEach(row => {
                 const tr = document.createElement('tr');
-                tr.className = "subtotal-row";
                 tr.innerHTML = `<td class="cat-name">${row.label}</td>`;
                 gameState.players.forEach(p => {
                     const sum = upperCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
@@ -202,25 +274,19 @@
                 });
                 upTotal.appendChild(tr);
             });
-
             const rowsFinal = [
                 { label: "Gesamtpunkte unten", type: "sumLow" },
                 { label: "Gesamtpunkte oben", type: "sumUpAll" },
                 { label: "GESAMTPUNKTE", type: "grand" }
             ];
-
             rowsFinal.forEach(row => {
                 const tr = document.createElement('tr');
-                tr.className = "grand-total-row";
                 tr.innerHTML = `<td class="cat-name"><b>${row.label}</b></td>`;
                 gameState.players.forEach(p => {
                     const upSum = upperCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
-                    const bonus = upSum >= 63 ? 35 : 0;
                     const loSum = lowerCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
-                    let val = 0;
-                    if(row.type === "sumLow") val = loSum;
-                    else if(row.type === "sumUpAll") val = upSum + bonus;
-                    else val = upSum + bonus + loSum;
+                    const bonus = upSum >= 63 ? 35 : 0;
+                    let val = row.type === "sumLow" ? loSum : (row.type === "sumUpAll" ? upSum + bonus : upSum + bonus + loSum);
                     tr.innerHTML += `<td><b>${val}</b></td>`;
                 });
                 finalTotal.appendChild(tr);
@@ -270,13 +336,25 @@
             return 0;
         }
 
+        function createDiceElements() {
+            const grid = document.getElementById('diceGrid'); grid.innerHTML = '';
+            for(let i=0; i<5; i++) {
+                const d = document.createElement('div'); d.className = 'die'; d.id = 'die' + i;
+                d.onclick = () => toggleKeep(i); grid.appendChild(d);
+            }
+        }
+
         function checkGameOver() {
+            if(!gameState || !gameState.players) return;
             const allFilled = gameState.players.every(p => p.scores && Object.keys(p.scores).length === 13);
-            if(allFilled) document.getElementById('restartContainer').style.display = 'block';
+            if(allFilled && document.getElementById('restartContainer').style.display === 'none') {
+                document.getElementById('restartContainer').style.display = 'block';
+                saveMyResult();
+            }
         }
 
         window.resetOnlineGame = function() {
-            if(confirm("Löschen?")) { set(gameRef, null); location.reload(); }
+            if(confirm("Den gesamten Spielraum für alle leeren?")) { set(gameRef, null); location.reload(); }
         };
     </script>
 </body>
