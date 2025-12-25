@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Kniffel Deluxe - Image Version</title>
+<link rel="stylesheet" href="styles_kniffel.css">
+</head>
+Alles klar, Chris! Dann machen wir es so einfach wie möglich: Ein fester Raum für alle, damit du nicht erst Codes eingeben musst, sondern direkt loslegen kannst.
+
+Hier ist der komplette <body> bis </body> Bereich. Ich habe die Logik so schlank wie möglich gehalten, damit die Ein-Raum-Variante stabil läuft.
+
+Vergiss nicht: Du musst oben im <script> deine eigenen Daten aus der Firebase-Konsole eintragen, damit der "Funkverkehr" zur Cloud steht.
+
+HTML
+
+<body>
+
+    <div id="setup" class="setup-screen">
+        <h1>KNIFFEL ONLINE (Test-Raum)</h1>
+        <div id="playerSetup">
+            <p>Dein Nickname:</p>
+            <input type="text" id="userName" placeholder="z.B. Chris" style="padding:10px; font-size:18px; border-radius:5px; width:220px;">
+            <br><br>
+            <button class="btn" onclick="initOnlineGame()">Dem Spiel beitreten</button>
+        </div>
+    </div>
+
+    <div id="game" class="main-layout">
+        <div class="action-zone">
+            <div id="pDisplay" style="font-size: 22px; color: var(--gold); font-weight: bold;">Warte auf Spieler...</div>
+            <div class="dice-grid" id="diceGrid"></div>
+            <div style="font-size: 16px; margin-top: 10px;">Wurf: <span id="rollCount">0</span> / 3</div>
+            <button class="btn" id="rollBtn" onclick="handleRoll()">WÜRFELN</button>
+            <div id="myRoleInfo" style="font-size: 12px; color: #777; margin-top: 10px;"></div>
+        </div>
+
+        <div class="score-block-container">
+            <table class="score-table">
+                <thead><tr id="headerRow"><th class="cat-name">Kategorien</th></tr></thead>
+                <tbody id="upperBody"></tbody>
+                <tbody id="upperTotals"></tbody>
+                <tbody id="lowerBody"></tbody>
+                <tfoot id="finalTotals"></tfoot>
+            </table>
+            
+            <div id="restartContainer" style="display:none; text-align:center; margin-top:20px; padding-bottom:40px;">
+                <button class="btn restart-btn" onclick="resetOnlineGame()">🔄 SPIEL ZURÜCKSETZEN</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="endOverlay" class="overlay">
+        <div class="modal">
+            <h2>Endergebnis</h2>
+            <ul id="winnerList" class="winner-list"></ul>
+            <button class="btn" onclick="closeOverlay()">Tabelle ansehen</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // ########## HIER DEINE FIREBASE DATEN EINTRAGEN ##########
+        const firebaseConfig = {
+            apiKey: "AIzaSyAsznvjalpgFbi1LN1LLjJvlttZRC3NOzI",
+            authDomain: "kniffelig-7af1e.firebaseapp.com",
+            databaseURL: "https://kniffelig-7af1e.firebaseapp.com",
+            projectId: "kniffelig-7af1e",
+            appId: "1:1038332936720:web:9e29bb6297564fb10fc095"
+        };
+        // #########################################################
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const gameRef = ref(db, 'kniffel/testraum'); // Fester Raum "testraum"
+
+        let myName, myIndex = null;
+        let gameState = null;
+
+        const upperCats = [
+            { id: '1', n: 'Einser', v: 1 }, { id: '2', n: 'Zweier', v: 2 },
+            { id: '3', n: 'Dreier', v: 3 }, { id: '4', n: 'Vierer', v: 4 },
+            { id: '5', n: 'Fünfer', v: 5 }, { id: '6', n: 'Sechser', v: 6 }
+        ];
+        const lowerCats = [
+            { id: '3p', n: '3er-Pasch' }, { id: '4p', n: '4er-Pasch' },
+            { id: 'fh', n: 'Full House' }, { id: 'ks', n: 'Kl. Straße' },
+            { id: 'gs', n: 'Gr. Straße' }, { id: 'kn', n: 'Kniffel' }, { id: 'ch', n: 'Chance' }
+        ];
+
+        window.initOnlineGame = function() {
+            myName = document.getElementById('userName').value.trim();
+            if(!myName) return alert("Bitte gib einen Namen ein!");
+
+            onValue(gameRef, (snapshot) => {
+                const data = snapshot.val();
+                if(!data) {
+                    const initial = {
+                        players: [{ name: myName, scores: {} }],
+                        activePlayer: 0,
+                        dice: [0,0,0,0,0],
+                        keeps: [false,false,false,false,false],
+                        rolls: 0
+                    };
+                    set(gameRef, initial);
+                    myIndex = 0;
+                } else {
+                    if(myIndex === null) {
+                        let idx = data.players.findIndex(p => p.name === myName);
+                        if(idx !== -1) myIndex = idx;
+                        else {
+                            myIndex = data.players.length;
+                            const newP = [...data.players, { name: myName, scores: {} }];
+                            update(gameRef, { players: newP });
+                        }
+                    }
+                }
+                gameState = data || gameState;
+                syncUI();
+            });
+
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('game').style.display = 'flex';
+            createDiceElements();
+        };
+
+        function createDiceElements() {
+            const grid = document.getElementById('diceGrid');
+            grid.innerHTML = '';
+            for(let i=0; i<5; i++) {
+                const d = document.createElement('div');
+                d.className = 'die'; d.id = 'die' + i;
+                d.onclick = () => toggleKeep(i);
+                grid.appendChild(d);
+            }
+        }
+
+        function syncUI() {
+            if(!gameState) return;
+            const hRow = document.getElementById('headerRow');
+            hRow.innerHTML = '<th class="cat-name">Kategorien</th>';
+            gameState.players.forEach((p, i) => {
+                const th = document.createElement('th');
+                th.innerText = p.name;
+                th.className = (i === gameState.activePlayer) ? 'active-col' : '';
+                hRow.appendChild(th);
+            });
+
+            document.getElementById('pDisplay').innerText = gameState.players[gameState.activePlayer].name + " ist dran";
+            document.getElementById('rollCount').innerText = gameState.rolls;
+            document.getElementById('myRoleInfo').innerText = "Du spielst als: " + myName;
+            
+            // Würfel-Update
+            gameState.dice.forEach((val, i) => {
+                const dieEl = document.getElementById('die' + i);
+                if(!dieEl) return;
+                dieEl.classList.toggle('keep', gameState.keeps[i]);
+                dieEl.style.backgroundImage = val > 0 ? `url('wuerfel_${val}.jpg')` : "none";
+                if(val === 0) dieEl.style.backgroundColor = "#2a2a4a";
+            });
+
+            document.getElementById('rollBtn').disabled = (gameState.activePlayer !== myIndex || gameState.rolls >= 3);
+            renderTable();
+        }
+
+        window.handleRoll = function() {
+            if(myIndex !== gameState.activePlayer) return;
+            let newDice = [...gameState.dice];
+            for(let i=0; i<5; i++) {
+                if(!gameState.keeps[i]) newDice[i] = Math.floor(Math.random()*6)+1;
+            }
+            update(gameRef, { dice: newDice, rolls: gameState.rolls + 1 });
+        };
+
+        function toggleKeep(i) {
+            if(myIndex !== gameState.activePlayer || gameState.rolls === 0) return;
+            let newKeeps = [...gameState.keeps];
+            newKeeps[i] = !newKeeps[i];
+            update(gameRef, { keeps: newKeeps });
+        }
+
+        function renderTable() {
+            renderSection('upperBody', upperCats, true);
+            renderSection('lowerBody', lowerCats, false);
+        }
+
+        function renderSection(tbodyId, cats, isUpper) {
+            const body = document.getElementById(tbodyId); body.innerHTML = '';
+            cats.forEach(c => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="cat-name">${c.n}</td>`;
+                gameState.players.forEach((p, i) => {
+                    const td = document.createElement('td');
+                    const score = p.scores[c.id];
+                    if(score !== undefined) {
+                        td.innerHTML = `<span class="filled">${score}</span>`;
+                    } else if(i === gameState.activePlayer && i === myIndex && gameState.rolls > 0) {
+                        const val = calculatePoints(c.id, gameState.dice, c.v);
+                        td.innerHTML = `<span class="preview" onclick="selectScore('${c.id}', ${val})">${val}</span>`;
+                        td.className = 'score-cell active-col';
+                    } else if(i === gameState.activePlayer) {
+                        td.className = 'active-col';
+                    }
+                    tr.appendChild(td);
+                });
+                body.appendChild(tr);
+            });
+        }
+
+        window.selectScore = function(catId, value) {
+            let updates = {};
+            updates[`players/${myIndex}/scores/${catId}`] = value;
+            updates[`activePlayer`] = (gameState.activePlayer + 1) % gameState.players.length;
+            updates[`rolls`] = 0;
+            updates[`dice`] = [0,0,0,0,0];
+            updates[`keeps`] = [false,false,false,false,false];
+            update(gameRef, updates);
+        };
+
+        function calculatePoints(id, d, v) {
+            if(v) return d.filter(x => x === v).length * v;
+            const counts = {}; d.forEach(x => counts[x] = (counts[x]||0)+1);
+            const vals = Object.values(counts);
+            const sum = d.reduce((a,b)=>a+b,0);
+            if(id === '3p') return vals.some(x => x >= 3) ? sum : 0;
+            if(id === '4p') return vals.some(x => x >= 4) ? sum : 0;
+            if(id === 'fh') return vals.includes(2) && vals.includes(3) ? 25 : 0;
+            if(id === 'kn') return vals.includes(5) ? 50 : 0;
+            if(id === 'ch') return sum;
+            const s = [...new Set(d)].sort().join('');
+            if(id === 'ks') return /1234|2345|3456/.test(s) ? 30 : 0;
+            if(id === 'gs') return /12345|23456/.test(s) ? 40 : 0;
+            return 0;
+        }
+
+        window.resetOnlineGame = function() {
+            if(confirm("Wirklich das gesamte Spiel für ALLE zurücksetzen?")) {
+                set(gameRef, null);
+                location.reload();
+            }
+        };
+        window.closeOverlay = () => document.getElementById('endOverlay').style.display='none';
+    </script>
+</body>
+</html>
