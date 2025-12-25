@@ -144,3 +144,62 @@
         width: 100vw; /* Volle Breite auf dem Handy */
     }
 }
+
+/* Chat-Styling */
+    #chatContainer {
+        margin-top: 20px;
+        background: var(--card-bg);
+        border: 1px solid #444;
+        border-radius: 12px;
+        padding: 15px;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+
+    #chatBox {
+        height: 180px;
+        overflow-y: auto;
+        background: #0a0a14;
+        border-radius: 8px;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #333;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--gold) #0a0a14;
+    }
+
+    /* Scrollbar für Chrome/Safari */
+    #chatBox::-webkit-scrollbar {
+        width: 6px;
+    }
+    #chatBox::-webkit-scrollbar-thumb {
+        background-color: var(--gold);
+        border-radius: 10px;
+    }
+
+    #chatBox div {
+        line-height: 1.4;
+        word-wrap: break-word;
+    }
+
+    #chatBox b {
+        color: var(--gold);
+        margin-right: 5px;
+    }
+
+    #chatInput {
+        flex: 1;
+        background: #252545;
+        border: 1px solid #444;
+        color: white;
+        padding: 10px;
+        border-radius: 6px;
+        outline: none;
+    }
+
+    #chatInput:focus {
+        border-color: var(--gold);
