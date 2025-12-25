@@ -8,7 +8,7 @@
 <body>
 
     <div id="setup" class="setup-screen">
-        <h1>KNIFFEL ONLINE</h1>
+        <h1>KNIFFEL ONLINE PRO</h1>
         <div id="playerSetup">
             <p>Dein Nickname:</p>
             <input type="text" id="userName" placeholder="z.B. Chris" style="padding:10px; font-size:18px; border-radius:5px; width:220px;">
@@ -53,7 +53,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-        // DEINE FIREBASE DATEN (AKTUALISIERT)
+        // FIREBASE DATEN
         const firebaseConfig = {
             apiKey: "AIzaSyAsznvjalpgFbi1LN1LLjJvlttZRC3NOzI",
             authDomain: "kniffelig-7af1e.firebaseapp.com",
@@ -86,7 +86,6 @@
 
             onValue(gameRef, (snapshot) => {
                 const data = snapshot.val();
-                
                 if(!data) {
                     const initial = {
                         players: [{ name: myName, scores: {} }],
@@ -129,8 +128,14 @@
             }
         }
 
+        const getSum = (pIdx, cats) => {
+            if(!gameState || !gameState.players[pIdx]) return 0;
+            return cats.reduce((s, c) => s + (gameState.players[pIdx].scores[c.id] || 0), 0);
+        };
+
         function syncUI() {
-            if(!gameState) return;
+            if(!gameState || !gameState.players) return;
+            
             const hRow = document.getElementById('headerRow');
             hRow.innerHTML = '<th class="cat-name">Kategorien</th>';
             gameState.players.forEach((p, i) => {
@@ -144,7 +149,6 @@
             document.getElementById('rollCount').innerText = gameState.rolls;
             document.getElementById('myRoleInfo').innerText = "Angemeldet als: " + myName;
             
-            // AKTUALISIERTE BILDER-LOGIK (.png)
             gameState.dice.forEach((val, i) => {
                 const dieEl = document.getElementById('die' + i);
                 if(!dieEl) return;
@@ -154,38 +158,25 @@
             });
 
             document.getElementById('rollBtn').disabled = (gameState.activePlayer !== myIndex || gameState.rolls >= 3);
-            renderTable();
-            checkGameOver();
-        }
-
-        window.handleRoll = function() {
-            if(!gameState || myIndex !== gameState.activePlayer) return;
-            let newDice = [...gameState.dice];
-            for(let i=0; i<5; i++) {
-                if(!gameState.keeps[i]) newDice[i] = Math.floor(Math.random()*6)+1;
-            }
-            update(gameRef, { dice: newDice, rolls: gameState.rolls + 1 });
-        };
-
-        function toggleKeep(i) {
-            if(!gameState || myIndex !== gameState.activePlayer || gameState.rolls === 0) return;
-            let newKeeps = [...gameState.keeps];
-            newKeeps[i] = !newKeeps[i];
-            update(gameRef, { keeps: newKeeps });
-        }
-
-        function renderTable() {
+            
             renderSection('upperBody', upperCats);
             renderUpperTotals();
             renderSection('lowerBody', lowerCats);
             renderFinalTotals();
+            checkGameOver();
         }
 
         function renderSection(tbodyId, cats) {
-            const body = document.getElementById(tbodyId); body.innerHTML = '';
+            const body = document.getElementById(tbodyId); 
+            if(!body) return;
+            body.innerHTML = '';
             cats.forEach(c => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td class="cat-name">${c.n}</td>`;
+                const tdLabel = document.createElement('td');
+                tdLabel.className = 'cat-name';
+                tdLabel.innerText = c.n;
+                tr.appendChild(tdLabel);
+
                 gameState.players.forEach((p, i) => {
                     const td = document.createElement('td');
                     const score = p.scores[c.id];
@@ -204,34 +195,67 @@
             });
         }
 
-        const getSum = (pIdx, cats) => cats.reduce((s, c) => s + (gameState.players[pIdx].scores[c.id] || 0), 0);
-
         function renderUpperTotals() {
-            const body = document.getElementById('upperTotals'); body.innerHTML = '';
+            const body = document.getElementById('upperTotals'); 
+            if(!body) return;
+            body.innerHTML = '';
             let rows = ["Punkte oben", "Bonus (63+)", "Gesamt oben"];
             rows.forEach((label, rIdx) => {
                 const tr = document.createElement('tr');
                 tr.className = rIdx === 2 ? 'grand-total-row' : 'subtotal-row';
-                tr.innerHTML = `<td class="cat-name">${label}</td>`;
-                for(let i=0; i<gameState.players.length; i++) {
+                const tdLabel = document.createElement('td');
+                tdLabel.className = 'cat-name';
+                tdLabel.innerText = label;
+                tr.appendChild(tdLabel);
+
+                for(let i=0; i < gameState.players.length; i++) {
+                    const td = document.createElement('td');
+                    if(i === gameState.activePlayer) td.className = 'active-col';
                     const sum = getSum(i, upperCats);
                     let val = (rIdx === 0) ? sum : (rIdx === 1 ? (sum >= 63 ? 35 : 0) : sum + (sum >= 63 ? 35 : 0));
-                    tr.innerHTML += `<td class="${i === gameState.activePlayer ? 'active-col' : ''}">${val}</td>`;
+                    td.innerText = val;
+                    tr.appendChild(td);
                 }
                 body.appendChild(tr);
             });
         }
 
         function renderFinalTotals() {
-            const foot = document.getElementById('finalTotals'); foot.innerHTML = '';
-            const tr = document.createElement('tr'); tr.className = 'grand-total-row';
-            tr.innerHTML = `<td class="cat-name">GESAMT</td>`;
+            const foot = document.getElementById('finalTotals'); 
+            if(!foot) return;
+            foot.innerHTML = '';
+            const tr = document.createElement('tr'); 
+            tr.className = 'grand-total-row';
+            const tdLabel = document.createElement('td');
+            tdLabel.className = 'cat-name';
+            tdLabel.innerText = "GESAMT";
+            tr.appendChild(tdLabel);
+
             gameState.players.forEach((p, i) => {
+                const td = document.createElement('td');
+                if(i === gameState.activePlayer) td.className = 'active-col';
                 const up = getSum(i, upperCats);
                 const total = up + (up >= 63 ? 35 : 0) + getSum(i, lowerCats);
-                tr.innerHTML += `<td class="${i === gameState.activePlayer ? 'active-col' : ''}">${total}</td>`;
+                td.innerText = total;
+                tr.appendChild(td);
             });
             foot.appendChild(tr);
+        }
+
+        window.handleRoll = function() {
+            if(!gameState || myIndex !== gameState.activePlayer) return;
+            let newDice = [...gameState.dice];
+            for(let i=0; i<5; i++) {
+                if(!gameState.keeps[i]) newDice[i] = Math.floor(Math.random()*6)+1;
+            }
+            update(gameRef, { dice: newDice, rolls: gameState.rolls + 1 });
+        };
+
+        function toggleKeep(i) {
+            if(!gameState || myIndex !== gameState.activePlayer || gameState.rolls === 0) return;
+            let newKeeps = [...gameState.keeps];
+            newKeeps[i] = !newKeeps[i];
+            update(gameRef, { keeps: newKeeps });
         }
 
         window.selectScore = function(catId, value) {
