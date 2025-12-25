@@ -148,7 +148,7 @@
                 const dieEl = document.getElementById('die' + i);
                 if(!dieEl) return;
                 dieEl.classList.toggle('keep', gameState.keeps[i]);
-                dieEl.style.backgroundImage = val > 0 ? `url('wuerfel_${val}.jpg')` : "none";
+                dieEl.style.backgroundImage = val > 0 ? `url('wuerfel${val}.png')` : "none";
                 if(val === 0) dieEl.style.backgroundColor = "#2a2a4a";
             });
 
