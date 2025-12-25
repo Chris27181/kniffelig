@@ -8,7 +8,7 @@
 <body>
 
     <div id="setup" class="setup-screen">
-        <h1>KNIFFEL ONLINE (Test-Raum)</h1>
+        <h1>KNIFFEL ONLINE</h1>
         <div id="playerSetup">
             <p>Dein Nickname:</p>
             <input type="text" id="userName" placeholder="z.B. Chris" style="padding:10px; font-size:18px; border-radius:5px; width:220px;">
@@ -36,7 +36,7 @@
             </table>
             
             <div id="restartContainer" style="display:none; text-align:center; margin-top:20px; padding-bottom:40px;">
-                <button class="btn restart-btn" onclick="resetOnlineGame()">🔄 SPIEL ZURÜCKSETZEN</button>
+                <button class="btn restart-btn" onclick="resetOnlineGame()">🔄 RAUM LEEREN & NEUSTART</button>
             </div>
         </div>
     </div>
@@ -53,7 +53,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-        // ########## HIER DEINE FIREBASE DATEN EINTRAGEN ##########
+        // ########## DEINE FIREBASE DATEN ##########
         const firebaseConfig = {
             apiKey: "AIzaSyAsznvjalpgFbi1LN1LLjJvlttZRC3NOzI",
             authDomain: "kniffelig-7af1e.firebaseapp.com",
@@ -61,11 +61,11 @@
             projectId: "kniffelig-7af1e",
             appId: "1:1038332936720:web:9e29bb6297564fb10fc095"
         };
-        // #########################################################
+        // ##########################################
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const gameRef = ref(db, 'kniffel/testraum'); // Fester Raum "testraum"
+        const gameRef = ref(db, 'kniffel/testraum');
 
         let myName, myIndex = null;
         let gameState = null;
@@ -83,10 +83,12 @@
 
         window.initOnlineGame = function() {
             myName = document.getElementById('userName').value.trim();
-            if(!myName) return alert("Bitte gib einen Namen ein!");
+            if(!myName) return alert("Bitte Name eingeben!");
 
             onValue(gameRef, (snapshot) => {
                 const data = snapshot.val();
+                gameState = data;
+
                 if(!data) {
                     const initial = {
                         players: [{ name: myName, scores: {} }],
@@ -97,18 +99,15 @@
                     };
                     set(gameRef, initial);
                     myIndex = 0;
-                } else {
-                    if(myIndex === null) {
-                        let idx = data.players.findIndex(p => p.name === myName);
-                        if(idx !== -1) myIndex = idx;
-                        else {
-                            myIndex = data.players.length;
-                            const newP = [...data.players, { name: myName, scores: {} }];
-                            update(gameRef, { players: newP });
-                        }
+                } else if(myIndex === null) {
+                    let idx = data.players.findIndex(p => p.name === myName);
+                    if(idx !== -1) myIndex = idx;
+                    else {
+                        myIndex = data.players.length;
+                        const newP = [...data.players, { name: myName, scores: {} }];
+                        update(gameRef, { players: newP });
                     }
                 }
-                gameState = data || gameState;
                 syncUI();
             });
 
@@ -141,9 +140,8 @@
 
             document.getElementById('pDisplay').innerText = gameState.players[gameState.activePlayer].name + " ist dran";
             document.getElementById('rollCount').innerText = gameState.rolls;
-            document.getElementById('myRoleInfo').innerText = "Du spielst als: " + myName;
+            document.getElementById('myRoleInfo').innerText = "Angemeldet als: " + myName;
             
-            // Würfel-Update
             gameState.dice.forEach((val, i) => {
                 const dieEl = document.getElementById('die' + i);
                 if(!dieEl) return;
@@ -154,6 +152,7 @@
 
             document.getElementById('rollBtn').disabled = (gameState.activePlayer !== myIndex || gameState.rolls >= 3);
             renderTable();
+            checkGameOver();
         }
 
         window.handleRoll = function() {
@@ -173,11 +172,13 @@
         }
 
         function renderTable() {
-            renderSection('upperBody', upperCats, true);
-            renderSection('lowerBody', lowerCats, false);
+            renderSection('upperBody', upperCats);
+            renderUpperTotals();
+            renderSection('lowerBody', lowerCats);
+            renderFinalTotals();
         }
 
-        function renderSection(tbodyId, cats, isUpper) {
+        function renderSection(tbodyId, cats) {
             const body = document.getElementById(tbodyId); body.innerHTML = '';
             cats.forEach(c => {
                 const tr = document.createElement('tr');
@@ -198,6 +199,41 @@
                 });
                 body.appendChild(tr);
             });
+        }
+
+        // Summen-Logik
+        const getSum = (pIdx, cats) => cats.reduce((s, c) => s + (gameState.players[pIdx].scores[c.id] || 0), 0);
+
+        function renderUpperTotals() {
+            const body = document.getElementById('upperTotals'); body.innerHTML = '';
+            const playerCounts = gameState.players.length;
+            let rows = ["Punkte oben", "Bonus (63+)", "Gesamt oben"];
+            rows.forEach((label, rIdx) => {
+                const tr = document.createElement('tr');
+                tr.className = rIdx === 2 ? 'grand-total-row' : 'subtotal-row';
+                tr.innerHTML = `<td class="cat-name">${label}</td>`;
+                for(let i=0; i<playerCounts; i++) {
+                    let val = 0;
+                    const sum = getSum(i, upperCats);
+                    if(rIdx === 0) val = sum;
+                    else if(rIdx === 1) val = sum >= 63 ? 35 : 0;
+                    else val = sum + (sum >= 63 ? 35 : 0);
+                    tr.innerHTML += `<td class="${i === gameState.activePlayer ? 'active-col' : ''}">${val}</td>`;
+                }
+                body.appendChild(tr);
+            });
+        }
+
+        function renderFinalTotals() {
+            const foot = document.getElementById('finalTotals'); foot.innerHTML = '';
+            const tr = document.createElement('tr'); tr.className = 'grand-total-row';
+            tr.innerHTML = `<td class="cat-name">GESAMT</td>`;
+            gameState.players.forEach((p, i) => {
+                const up = getSum(i, upperCats);
+                const total = up + (up >= 63 ? 35 : 0) + getSum(i, lowerCats);
+                tr.innerHTML += `<td class="${i === gameState.activePlayer ? 'active-col' : ''}">${total}</td>`;
+            });
+            foot.appendChild(tr);
         }
 
         window.selectScore = function(catId, value) {
@@ -226,11 +262,16 @@
             return 0;
         }
 
-        window.resetOnlineGame = function() {
-            if(confirm("Wirklich das gesamte Spiel für ALLE zurücksetzen?")) {
-                set(gameRef, null);
-                location.reload();
+        function checkGameOver() {
+            const allFilled = gameState.players.every(p => Object.keys(p.scores).length === 13);
+            if(allFilled) {
+                document.getElementById('restartContainer').style.display = 'block';
+                // Winner List im Overlay füllen... (wie vorher)
             }
+        }
+
+        window.resetOnlineGame = function() {
+            if(confirm("Alles löschen?")) { set(gameRef, null); location.reload(); }
         };
         window.closeOverlay = () => document.getElementById('endOverlay').style.display='none';
     </script>
