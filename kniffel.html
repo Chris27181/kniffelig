@@ -19,29 +19,27 @@
 
     <div id="game" class="main-layout" style="display:none;">
         <div class="action-zone">
-            <div id="pDisplay" style="font-size: 22px; color: gold; font-weight: bold;">Warte auf Daten...</div>
+            <div id="pDisplay" style="font-size: 22px; color: #090866; font-weight: bold;">Warte auf Daten...</div>
             <div class="dice-grid" id="diceGrid"></div>
             <div style="font-size: 16px; margin-top: 10px;">Wurf: <span id="rollCount">0</span> / 3</div>
             <button class="btn" id="rollBtn" onclick="handleRoll()">WÜRFELN</button>
             <div id="myRoleInfo" style="font-size: 12px; color: #777; margin-top: 10px;"></div>
         </div>
 
-        <div class="score-block-container">
-            <table class="score-table" id="kniffelTable" style="width: 100%; border-collapse: collapse;">
+        <div class="score-block-container" style="overflow-x: auto;">
+            <table class="score-table" id="kniffelTable" style="min-width: 320px; border-collapse: collapse; width: 100%;">
                 <thead><tr id="headerRow"><th class="cat-name">Kategorien</th></tr></thead>
                 <tbody id="upperBody"></tbody>
-                <tbody id="upperTotals"></tbody>
+                <tbody id="upperTotals"></tbody> 
                 <tbody id="lowerBody"></tbody>
-                <tfoot id="finalTotals"></tfoot>
+                <tfoot id="finalTotals"></tfoot> 
             </table>
             
-            <div id="chatContainer" style="margin-top:20px; background: #1a1a2e; border: 1px solid #444; border-radius: 8px; padding: 10px;">
-                <div id="chatBox" style="height: 150px; overflow-y: auto; color: white; font-size: 14px; text-align: left; margin-bottom: 10px; padding: 5px; background: #0f0f1a;">
-                    <i>Willkommen im Chat!</i>
-                </div>
+            <div id="chatContainer">
+                <div id="chatBox"><i>Willkommen im Chat!</i></div>
                 <div style="display: flex; gap: 5px;">
-                    <input type="text" id="chatInput" placeholder="Nachricht..." style="flex: 1; padding: 8px; border-radius: 4px; border: none;">
-                    <button class="btn" onclick="sendChatMessage()" style="padding: 8px 15px;">Senden</button>
+                    <input type="text" id="chatInput" placeholder="Nachricht...">
+                    <button class="btn" onclick="sendChatMessage()">Senden</button>
                 </div>
             </div>
 
@@ -66,7 +64,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const gameRef = ref(db, 'kniffel/testraum');
-        const chatRef = ref(db, 'kniffel/testraum/chat'); // Pfad für den Chat
+        const chatRef = ref(db, 'kniffel/testraum/chat');
 
         let myName, myIndex = null, gameState = null;
 
@@ -84,7 +82,6 @@
         window.initOnlineGame = function() {
             myName = document.getElementById('userName').value.trim();
             if(!myName) return alert("Name fehlt!");
-
             document.getElementById('setup').style.display = 'none';
             document.getElementById('game').style.display = 'flex';
 
@@ -106,11 +103,10 @@
                             update(gameRef, { players: newP });
                         }
                     }
-                    // Chat-Nachrichten anzeigen
                     if(data.chat) {
                         const chatBox = document.getElementById('chatBox');
                         chatBox.innerHTML = '';
-                        Object.values(data.chat).slice(-10).forEach(msg => { // Zeige nur die letzten 10 Nachrichten
+                        Object.values(data.chat).slice(-15).forEach(msg => {
                             chatBox.innerHTML += `<div><b>${msg.user}:</b> ${msg.text}</div>`;
                         });
                         chatBox.scrollTop = chatBox.scrollHeight;
@@ -118,26 +114,8 @@
                 }
                 syncUI();
             });
-
             createDiceElements();
         };
-
-        // CHAT SENDEN FUNKTION
-        window.sendChatMessage = function() {
-            const input = document.getElementById('chatInput');
-            const text = input.value.trim();
-            if(text !== "") {
-                push(chatRef, { user: myName, text: text });
-                input.value = '';
-            }
-        };
-
-        // Enter-Taste zum Senden erlauben
-        document.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter' && document.activeElement.id === 'chatInput') {
-                sendChatMessage();
-            }
-        });
 
         function createDiceElements() {
             const grid = document.getElementById('diceGrid');
@@ -160,17 +138,22 @@
                 if(i === gameState.activePlayer) th.style.backgroundColor = "rgba(255, 215, 0, 0.2)";
                 hRow.appendChild(th);
             });
+
             gameState.dice.forEach((val, i) => {
                 const dieEl = document.getElementById('die' + i);
                 if(!dieEl) return;
                 dieEl.className = gameState.keeps[i] ? 'die keep' : 'die';
                 dieEl.style.backgroundImage = val > 0 ? `url('wuerfel${val}.png')` : "none";
             });
+
             document.getElementById('pDisplay').innerText = gameState.players[gameState.activePlayer].name + " ist dran";
-            document.getElementById('rollBtn').disabled = (gameState.activePlayer !== myIndex || gameState.rolls >= 3);
+            document.getElementById('rollCount').innerText = gameState.rolls;
+            document.getElementById('myRoleInfo').innerText = "Spieler: " + myName;
+            
             renderSection('upperBody', upperCats);
             renderSection('lowerBody', lowerCats);
             renderSums();
+            checkGameOver();
         }
 
         function renderSection(tbodyId, cats) {
@@ -187,8 +170,7 @@
                     } else if(i === gameState.activePlayer && i === myIndex && gameState.rolls > 0) {
                         const val = calculatePoints(c.id, gameState.dice, c.v);
                         const span = document.createElement('span');
-                        span.className = 'preview';
-                        span.innerText = val;
+                        span.className = 'preview'; span.innerText = val;
                         span.onclick = () => selectScore(c.id, val);
                         td.appendChild(span);
                     }
@@ -201,22 +183,55 @@
         function renderSums() {
             const upTotal = document.getElementById('upperTotals'); upTotal.innerHTML = '';
             const finalTotal = document.getElementById('finalTotals'); finalTotal.innerHTML = '';
-            const trUpper = document.createElement('tr');
-            trUpper.innerHTML = `<td class="cat-name">Gesamt Oben</td>`;
-            const trFinal = document.createElement('tr');
-            trFinal.innerHTML = `<td class="cat-name">GESAMT</td>`;
-            gameState.players.forEach((p, i) => {
-                const upSum = upperCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
-                const bonus = upSum >= 63 ? 35 : 0;
-                const loSum = lowerCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
-                const tdU = document.createElement('td'); tdU.innerText = upSum + bonus;
-                trUpper.appendChild(tdU);
-                const tdF = document.createElement('td'); tdF.innerText = upSum + bonus + loSum;
-                trFinal.appendChild(tdF);
+            
+            const rowsUpper = [
+                { label: "Punkte oben", type: "sum" },
+                { label: "Bonus (ab 63 Pkte)", type: "bonus" },
+                { label: "Gesamtpunkte oben", type: "totalUp" }
+            ];
+
+            rowsUpper.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "subtotal-row";
+                tr.innerHTML = `<td class="cat-name">${row.label}</td>`;
+                gameState.players.forEach(p => {
+                    const sum = upperCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
+                    const bonus = sum >= 63 ? 35 : 0;
+                    let val = (row.type === "sum") ? sum : (row.type === "bonus" ? bonus : sum + bonus);
+                    tr.innerHTML += `<td>${val}</td>`;
+                });
+                upTotal.appendChild(tr);
             });
-            upTotal.appendChild(trUpper);
-            finalTotal.appendChild(trFinal);
+
+            const rowsFinal = [
+                { label: "Gesamtpunkte unten", type: "sumLow" },
+                { label: "Gesamtpunkte oben", type: "sumUpAll" },
+                { label: "GESAMTPUNKTE", type: "grand" }
+            ];
+
+            rowsFinal.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "grand-total-row";
+                tr.innerHTML = `<td class="cat-name"><b>${row.label}</b></td>`;
+                gameState.players.forEach(p => {
+                    const upSum = upperCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
+                    const bonus = upSum >= 63 ? 35 : 0;
+                    const loSum = lowerCats.reduce((s, c) => s + (p.scores && p.scores[c.id] ? p.scores[c.id] : 0), 0);
+                    let val = 0;
+                    if(row.type === "sumLow") val = loSum;
+                    else if(row.type === "sumUpAll") val = upSum + bonus;
+                    else val = upSum + bonus + loSum;
+                    tr.innerHTML += `<td><b>${val}</b></td>`;
+                });
+                finalTotal.appendChild(tr);
+            });
         }
+
+        window.sendChatMessage = function() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if(text !== "") { push(chatRef, { user: myName, text: text }); input.value = ''; }
+        };
 
         window.handleRoll = function() {
             if(!gameState || myIndex !== gameState.activePlayer) return;
@@ -253,6 +268,11 @@
             if(id === 'ks') return /1234|2345|3456/.test(s) ? 30 : 0;
             if(id === 'gs') return /12345|23456/.test(s) ? 40 : 0;
             return 0;
+        }
+
+        function checkGameOver() {
+            const allFilled = gameState.players.every(p => p.scores && Object.keys(p.scores).length === 13);
+            if(allFilled) document.getElementById('restartContainer').style.display = 'block';
         }
 
         window.resetOnlineGame = function() {
