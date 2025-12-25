@@ -1,55 +1,59 @@
 :root { --bg: #1a1a2e; --card: #16213e; --accent: #e94560; --gold: #f1c40f; --text: #f1f2f6; }
-        body { font-family: 'Segoe UI', sans-serif; background-image: url("back_wuerfel.jpg");; color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .setup-screen { background: #ddd; padding: 40px; border-radius: 20px; text-align: center; border: 2px solid #333; margin-top: 50px; }
-        .main-layout { display: none; gap: 30px; width: 100%; max-width: 1400px; align-items: flex-start; justify-content: center; }
+
+	body { font-family: 'Segoe UI', sans-serif; background-image: url("back_wuerfel1.jpg"); color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+	.setup-screen { background: #ddd; padding: 40px; border-radius: 20px; text-align: center; border: 2px solid #333; margin-top: 50px; }
+	.main-layout { display: none; gap: 30px; width: 100%; max-width: 1400px; align-items: flex-start; justify-content: center; }
         
-        /* ########## STYLESHEET FÜR WÜRFEL-BILDER ########## */
-        .action-zone { position: sticky; top: 20px; background: #DDD; padding: 25px; border-radius: 15px; width: 280px; display: flex; flex-direction: column; align-items: center; gap: 20px; border: 2px solid #333; flex-shrink: 0; }
-        .dice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; justify-items: center; }
-        .dice-grid div:last-child:nth-child(odd) { grid-column: 1 / span 2; }
+/* ########## STYLESHEET FÜR WÜRFEL-BILDER ########## */
+	.action-zone { position: sticky; top: 20px; background: #DDD; padding: 25px; border-radius: 15px; width: 280px; display: flex; flex-direction: column; align-items: center; gap: 20px; border: 2px solid #333; flex-shrink: 0; }
+	.dice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; justify-items: center; }
+	.dice-grid div:last-child:nth-child(odd) { grid-column: 1 / span 2; }
 
-        .die { 
-            width: 50px; height: 50px; 
-            border-radius: 2px; cursor: pointer; 
-            background-color: #fff; /* Ersatzfarbe falls Bild fehlt */
-            background-size: cover; 
-            background-position: center;
-            transition: all 0.2s ease; 
-            box-shadow: 0 4px 5px rgba(0,0,0,0.5);
-            border: 2px solid transparent;
-        }
+	.die {
+		width: 50px;
+		height: 50px;
+		border-radius: 2px; cursor: pointer; 
+		background-color: #fff; /* Ersatzfarbe falls Bild fehlt */
+		background-size: cover; 
+		background-position: center;
+		transition: all 0.2s ease; 
+		box-shadow: 0 4px 5px rgba(0,0,0,0.5);
+		border: 2px solid transparent;
+	}
         
-        /* Wenn ein Würfel ausgewählt/gehalten wird */
-        .die.keep { 
-            transform: translateY(-10px); 
-            border: 4px solid #e94560; 
-            box-shadow: 0 0 20px #f4a2b0; 
-        }
 
-        /* Schütteleffekt beim Würfeln */
-        @keyframes shake {
-            0% { transform: rotate(0deg); }
-            25% { transform: rotate(8deg) scale(1.1); }
-            50% { transform: rotate(-8deg); }
-            100% { transform: rotate(0deg); }
-        }
-        .shake { animation: shake 0.2s ease-in-out; }
+/* ########## WENN EIN WÜRFEL AUSGEWÄHLT/GEHALTEN WIRD ########## */
+	.die.keep { 
+		transform: translateY(-10px); 
+		border: 4px solid #e94560; 
+		box-shadow: 0 0 20px #f4a2b0; 
+	}
 
-        /* Block-Design */
+/* ########## SCHÜTTELEFFEKT BEIM WÜRFELN ########## */
+	@keyframes shake {
+		0% { transform: rotate(0deg); }
+		25% { transform: rotate(8deg) scale(1.1); }
+		50% { transform: rotate(-8deg); }
+		100% { transform: rotate(0deg); }
+	}
+
+.shake { animation: shake 0.2s ease-in-out; }
+
+/* ########## BLOCK-DESIGN ########## */
         .score-block-container { overflow-x: auto; background: #ddd; border-radius: 15px; padding: 10px; border: 2px solid #333; }
-        .score-table { border-collapse: collapse; min-width: 380px; }
+        .score-table { border-collapse: collapse; min-width: 460px; }
         .score-table th, .score-table td { padding: 8px 12px; border: 1px solid #333; text-align: center; }
         .cat-name { text-align: left !important; font-weight: bold; background: #ddd; position: sticky; left: 0; z-index: 2; width: 230px; }
-        .subtotal-row { background: #aaa; color: #333; }
-        .bonus-row { background: #aaa; color: #333; }
+        .subtotal-row { background: #aaa; font-weight: bold; color: #e94560; }
+        .bonus-row { background: #aaa; font-weight: bold; color: #e94560; }
         .grand-total-row { background: #aaa; font-weight: bold; color: #e94560; }
         .active-col { background: #f8c7cf !important; outline: 1px solid #333; }
         .score-cell { cursor: pointer; }
         .score-cell:hover:not(.filled) { background: rgba(233, 69, 96, 0.3); }
         .filled { color: #333; font-weight: bold; }
-        .preview { color: var(--accent); opacity: 0.6; font-weight: bold; }
-        .btn { background: var(--accent); color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 18px; width: 100%; box-shadow: 0 4px 0 #9b2c3e; }
-        .btn:disabled { opacity: 0.5; }
+        .preview { color: #e94560; opacity: 0.6; font-weight: bold; }
+        .btn { background: #8484b3; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 18px; width: 100%; box-shadow: 0 4px 0 #090866; }
+        .btn:disabled { opacity: 0.75; }
 
 /* Overlay / Modal Hintergrund */
 .overlay {
@@ -98,7 +102,7 @@
 }
 
 .restart-btn {
-    background: var(--gold);
+    background: #f1c40f;
     color: #1a1a2e;
     padding: 15px 30px;
     font-size: 1.2em;
@@ -118,7 +122,7 @@
 .confetti {
     position: absolute;
     width: 10px; height: 10px;
-    background-color: var(--accent);
+    background-color: #e94560;
     opacity: 0.8;
     top: -20px;
     animation: fall linear forwards;
@@ -148,19 +152,19 @@
 /* Chat-Styling */
     #chatContainer {
         margin-top: 20px;
-        background: var(--card-bg);
+        background: #99b3cc;
         border: 1px solid #444;
         border-radius: 12px;
         padding: 15px;
         width: 100%;
-        max-width: 400px;
+        max-width: 100%;
         box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
     #chatBox {
         height: 180px;
         overflow-y: auto;
-        background: #0a0a14;
+        background: #ddd;
         border-radius: 8px;
         padding: 10px;
         margin-bottom: 10px;
@@ -169,7 +173,7 @@
         flex-direction: column;
         gap: 5px;
         scrollbar-width: thin;
-        scrollbar-color: var(--gold) #0a0a14;
+        scrollbar-color: #f1c40f;
     }
 
     /* Scrollbar für Chrome/Safari */
@@ -177,7 +181,7 @@
         width: 6px;
     }
     #chatBox::-webkit-scrollbar-thumb {
-        background-color: var(--gold);
+        background-color: #DDDddd;
         border-radius: 10px;
     }
 
@@ -187,19 +191,19 @@
     }
 
     #chatBox b {
-        color: var(--gold);
+        color: #ddd;
         margin-right: 5px;
     }
 
     #chatInput {
         flex: 1;
-        background: #252545;
-        border: 1px solid #444;
-        color: white;
+        background: #ddd;
+        border: 1px solid #333;
+        color: #333;
         padding: 10px;
         border-radius: 6px;
         outline: none;
     }
 
     #chatInput:focus {
-        border-color: var(--gold);
+        border-color: #333;
