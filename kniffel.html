@@ -19,7 +19,7 @@
 
     <div id="game" class="main-layout">
         <div class="action-zone">
-            <div id="pDisplay" style="font-size: 22px; color: var(--gold); font-weight: bold;">Warte auf Spieler...</div>
+            <div id="pDisplay" style="font-size: 22px; color: var(--gold); font-weight: bold;">Verbindung wird hergestellt...</div>
             <div class="dice-grid" id="diceGrid"></div>
             <div style="font-size: 16px; margin-top: 10px;">Wurf: <span id="rollCount">0</span> / 3</div>
             <button class="btn" id="rollBtn" onclick="handleRoll()">WÜRFELN</button>
@@ -53,15 +53,14 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-        // ########## DEINE FIREBASE DATEN ##########
+        // DEINE FIREBASE DATEN (AKTUALISIERT)
         const firebaseConfig = {
             apiKey: "AIzaSyAsznvjalpgFbi1LN1LLjJvlttZRC3NOzI",
             authDomain: "kniffelig-7af1e.firebaseapp.com",
-            databaseURL: "https://kniffelig-7af1e-default-rtdb.europe-west1.firebasedatabase.app",
             projectId: "kniffelig-7af1e",
+            databaseURL: "https://kniffelig-7af1e-default-rtdb.europe-west1.firebasedatabase.app",
             appId: "1:1038332936720:web:9e29bb6297564fb10fc095"
         };
-        // ##########################################
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
@@ -87,8 +86,7 @@
 
             onValue(gameRef, (snapshot) => {
                 const data = snapshot.val();
-                gameState = data;
-
+                
                 if(!data) {
                     const initial = {
                         players: [{ name: myName, scores: {} }],
@@ -99,13 +97,17 @@
                     };
                     set(gameRef, initial);
                     myIndex = 0;
-                } else if(myIndex === null) {
-                    let idx = data.players.findIndex(p => p.name === myName);
-                    if(idx !== -1) myIndex = idx;
-                    else {
-                        myIndex = data.players.length;
-                        const newP = [...data.players, { name: myName, scores: {} }];
-                        update(gameRef, { players: newP });
+                    gameState = initial;
+                } else {
+                    gameState = data;
+                    if(myIndex === null) {
+                        let idx = data.players.findIndex(p => p.name === myName);
+                        if(idx !== -1) myIndex = idx;
+                        else {
+                            myIndex = data.players.length;
+                            const newP = [...data.players, { name: myName, scores: {} }];
+                            update(gameRef, { players: newP });
+                        }
                     }
                 }
                 syncUI();
@@ -142,6 +144,7 @@
             document.getElementById('rollCount').innerText = gameState.rolls;
             document.getElementById('myRoleInfo').innerText = "Angemeldet als: " + myName;
             
+            // AKTUALISIERTE BILDER-LOGIK (.png)
             gameState.dice.forEach((val, i) => {
                 const dieEl = document.getElementById('die' + i);
                 if(!dieEl) return;
@@ -156,7 +159,7 @@
         }
 
         window.handleRoll = function() {
-            if(myIndex !== gameState.activePlayer) return;
+            if(!gameState || myIndex !== gameState.activePlayer) return;
             let newDice = [...gameState.dice];
             for(let i=0; i<5; i++) {
                 if(!gameState.keeps[i]) newDice[i] = Math.floor(Math.random()*6)+1;
@@ -165,7 +168,7 @@
         };
 
         function toggleKeep(i) {
-            if(myIndex !== gameState.activePlayer || gameState.rolls === 0) return;
+            if(!gameState || myIndex !== gameState.activePlayer || gameState.rolls === 0) return;
             let newKeeps = [...gameState.keeps];
             newKeeps[i] = !newKeeps[i];
             update(gameRef, { keeps: newKeeps });
@@ -201,23 +204,18 @@
             });
         }
 
-        // Summen-Logik
         const getSum = (pIdx, cats) => cats.reduce((s, c) => s + (gameState.players[pIdx].scores[c.id] || 0), 0);
 
         function renderUpperTotals() {
             const body = document.getElementById('upperTotals'); body.innerHTML = '';
-            const playerCounts = gameState.players.length;
             let rows = ["Punkte oben", "Bonus (63+)", "Gesamt oben"];
             rows.forEach((label, rIdx) => {
                 const tr = document.createElement('tr');
                 tr.className = rIdx === 2 ? 'grand-total-row' : 'subtotal-row';
                 tr.innerHTML = `<td class="cat-name">${label}</td>`;
-                for(let i=0; i<playerCounts; i++) {
-                    let val = 0;
+                for(let i=0; i<gameState.players.length; i++) {
                     const sum = getSum(i, upperCats);
-                    if(rIdx === 0) val = sum;
-                    else if(rIdx === 1) val = sum >= 63 ? 35 : 0;
-                    else val = sum + (sum >= 63 ? 35 : 0);
+                    let val = (rIdx === 0) ? sum : (rIdx === 1 ? (sum >= 63 ? 35 : 0) : sum + (sum >= 63 ? 35 : 0));
                     tr.innerHTML += `<td class="${i === gameState.activePlayer ? 'active-col' : ''}">${val}</td>`;
                 }
                 body.appendChild(tr);
@@ -264,14 +262,11 @@
 
         function checkGameOver() {
             const allFilled = gameState.players.every(p => Object.keys(p.scores).length === 13);
-            if(allFilled) {
-                document.getElementById('restartContainer').style.display = 'block';
-                // Winner List im Overlay füllen... (wie vorher)
-            }
+            if(allFilled) document.getElementById('restartContainer').style.display = 'block';
         }
 
         window.resetOnlineGame = function() {
-            if(confirm("Alles löschen?")) { set(gameRef, null); location.reload(); }
+            if(confirm("Alle Spieler löschen und Neustart?")) { set(gameRef, null); location.reload(); }
         };
         window.closeOverlay = () => document.getElementById('endOverlay').style.display='none';
     </script>
