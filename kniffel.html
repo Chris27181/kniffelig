@@ -27,11 +27,11 @@
         </div>
 
         <div class="score-block-container">
-            <table class="score-table" id="kniffelTable">
-                <thead>
+            <table class="score-table" id="kniffelTable" style="table-layout: fixed; width: 100%;">
+                <thead id="tableHead">
                     <tr id="headerRow">
-                        <th class="cat-name">Kategorien</th>
-                        </tr>
+                        <th class="cat-name" style="width: 120px;">Kategorien</th>
+                    </tr>
                 </thead>
                 <tbody id="upperBody"></tbody>
                 <tbody id="upperTotals"></tbody>
@@ -126,7 +126,7 @@
         function syncUI() {
             if(!gameState || !gameState.players) return;
             
-            // 1. Header Spielerliste
+            // Header neu aufbauen
             const hRow = document.getElementById('headerRow');
             hRow.innerHTML = '<th class="cat-name">Kategorien</th>';
             gameState.players.forEach((p, i) => {
@@ -136,7 +136,6 @@
                 hRow.appendChild(th);
             });
 
-            // 2. Info & Würfel
             document.getElementById('pDisplay').innerText = gameState.players[gameState.activePlayer].name + " ist dran";
             document.getElementById('rollCount').innerText = gameState.rolls;
             document.getElementById('myRoleInfo').innerText = "Spieler: " + myName;
@@ -151,7 +150,6 @@
 
             document.getElementById('rollBtn').disabled = (gameState.activePlayer !== myIndex || gameState.rolls >= 3);
             
-            // 3. Tabellenbereiche rendern
             renderRows('upperBody', upperCats);
             renderUpperSums();
             renderRows('lowerBody', lowerCats);
@@ -163,7 +161,11 @@
             const el = document.getElementById(id); el.innerHTML = '';
             cats.forEach(c => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td class="cat-name">${c.n}</td>`;
+                const tdCat = document.createElement('td');
+                tdCat.className = 'cat-name';
+                tdCat.innerText = c.n;
+                tr.appendChild(tdCat);
+
                 gameState.players.forEach((p, i) => {
                     const td = document.createElement('td');
                     if(i === gameState.activePlayer) td.className = 'active-col';
@@ -173,7 +175,11 @@
                         td.innerHTML = `<span class="filled">${score}</span>`;
                     } else if(i === gameState.activePlayer && i === myIndex && gameState.rolls > 0) {
                         const val = calculatePoints(c.id, gameState.dice, c.v);
-                        td.innerHTML = `<span class="preview" onclick="selectScore('${c.id}', ${val})">${val}</span>`;
+                        const span = document.createElement('span');
+                        span.className = 'preview';
+                        span.innerText = val;
+                        span.onclick = () => selectScore(c.id, val);
+                        td.appendChild(span);
                     }
                     tr.appendChild(td);
                 });
@@ -187,15 +193,16 @@
             labels.forEach((label, rIdx) => {
                 const tr = document.createElement('tr');
                 tr.className = rIdx === 2 ? 'grand-total-row' : 'subtotal-row';
-                tr.innerHTML = `<td class="cat-name">${label}</td>`;
+                const tdCat = document.createElement('td');
+                tdCat.className = 'cat-name';
+                tdCat.innerText = label;
+                tr.appendChild(tdCat);
+
                 gameState.players.forEach((p, i) => {
                     const td = document.createElement('td');
                     if(i === gameState.activePlayer) td.className = 'active-col';
                     const sum = upperCats.reduce((s, c) => s + (p.scores ? (p.scores[c.id] || 0) : 0), 0);
-                    let val = 0;
-                    if(rIdx === 0) val = sum;
-                    else if(rIdx === 1) val = sum >= 63 ? 35 : 0;
-                    else val = sum + (sum >= 63 ? 35 : 0);
+                    let val = (rIdx === 0) ? sum : (rIdx === 1 ? (sum >= 63 ? 35 : 0) : sum + (sum >= 63 ? 35 : 0));
                     td.innerText = val;
                     tr.appendChild(td);
                 });
@@ -206,7 +213,11 @@
         function renderFinalTotals() {
             const el = document.getElementById('finalTotals'); el.innerHTML = '';
             const tr = document.createElement('tr'); tr.className = 'grand-total-row';
-            tr.innerHTML = `<td class="cat-name">GESAMT</td>`;
+            const tdCat = document.createElement('td');
+            tdCat.className = 'cat-name';
+            tdCat.innerText = "GESAMT";
+            tr.appendChild(tdCat);
+
             gameState.players.forEach((p, i) => {
                 const td = document.createElement('td');
                 if(i === gameState.activePlayer) td.className = 'active-col';
